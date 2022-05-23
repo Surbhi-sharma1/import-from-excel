@@ -7,7 +7,7 @@ export class ExcelService {
 
   async getData(types: Record<string, string>) {
     // for now reading file from here
-    const file = XLSX.readFile(__dirname + '/../../testSubtaskOneSheet.xlsx', {
+    const file = XLSX.readFile(__dirname + '/../../test.xlsx', {
       cellStyles: true,
     });
 
@@ -17,7 +17,7 @@ export class ExcelService {
     sheets.forEach((sheet: any) => {
       const rowOutlineLevel: number[] = [];
 
-      //find max outline level
+      //find max outline level - can be taken as input from user also
       let maxOutlineLevel = 0;
       sheet['!rows'].forEach((row: any, index: number) => {
         rowOutlineLevel[index] = row.level;

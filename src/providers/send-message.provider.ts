@@ -6,7 +6,7 @@ import {
 import {/* inject, */ BindingScope, injectable, Provider} from '@loopback/core';
 import {MessageData} from '../types';
 
-const client = new SQSClient({region: 'us-east-1'});
+export const client = new SQSClient({region: 'us-east-1'});
 
 @injectable({scope: BindingScope.TRANSIENT})
 export class SendMessageProvider
@@ -53,9 +53,12 @@ export class SendMessageProvider
     }
   }
 }
-function getQueueURL(level: number) {
+export function getQueueURL(level: number) {
   // max 8 levels permitted in excel. take queue urls from user
   switch (level) {
+    case 0:
+      return 'https://sqs.us-east-1.amazonaws.com/341707006720/import-level0';
+
     case 1:
       return 'https://sqs.us-east-1.amazonaws.com/341707006720/import-level1';
 

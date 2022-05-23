@@ -11,14 +11,18 @@ export class ImportController {
       data: MessageData[],
       level: number,
     ) => Promise<void>,
+    @inject('importService.receiveMessageListener.provider')
+    private receiveMessageListenerFn: () => void, // @inject('importService.receiveMessageListener.provider') // private receiveMessageListenerFn: () => void,
   ) {}
 
   @post('/import')
   async importFromExcel() {
     let LevelWiseBatches = await this.excelService.getData({});
 
-    LevelWiseBatches.forEach((data, index) => {
-      this.sendMessageFn(data, index + 1);
-    });
+    for (let i = 0; i < LevelWiseBatches.length; i++) {
+      this.sendMessageFn(LevelWiseBatches[i], i);
+    }
+
+    this.receiveMessageListenerFn();
   }
 }

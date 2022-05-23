@@ -1,7 +1,13 @@
+import {
+  DeleteMessageBatchCommand,
+  DeleteMessageBatchRequestEntry,
+  ReceiveMessageCommand,
+} from '@aws-sdk/client-sqs';
 import {/* inject, */ BindingScope, injectable, Provider} from '@loopback/core';
+import {client, getQueueURL} from './send-message.provider';
 
-const queueUrl =
-  'https://sqs.us-east-1.amazonaws.com/341707006720/import-excel-barleen.fifo';
+// const queueUrl =
+//   'https://sqs.us-east-1.amazonaws.com/341707006720/import-excel-barleen.fifo';
 
 @injectable({scope: BindingScope.TRANSIENT})
 export class ReceiveMessageListenerProvider implements Provider<() => void> {
@@ -12,43 +18,57 @@ export class ReceiveMessageListenerProvider implements Provider<() => void> {
   }
 }
 
-function receiveMessageListener() {
+async function receiveMessageListener() {
+  // take max outline level as input from user
+  for (let i = 0; i <= 4; i++) {
+    await receive(i, new Date());
+  }
+}
+async function receive(level: number, startTime: Date, group: number = 1) {
+  //MaxNumberOfMessages maximum value = 10
+  //WaitTimeSeconds maximum value = 20
   const params = {
     AttributeNames: ['SentTimestamp'],
-    MaxNumberOfMessages: 5,
+    MaxNumberOfMessages: 10,
     MessageAttributeNames: ['All'],
-    QueueUrl: queueUrl,
+    QueueUrl: getQueueURL(level),
     WaitTimeSeconds: 20,
   };
-  // sqs.receiveMessage(params, (err: AWSError, data: ReceiveMessageResult) => {
-  //   if (err) {
-  //     console.log('Receive Error', err);
-  //   } else if (data.Messages) {
-  //     console.log(`recevied message ${index++}`);
-  //     data.Messages.forEach(message => {
-  //       const res: {rows: any[]; types: any[]} = JSON.parse(
-  //         message.Body as string,
-  //       );
 
-  //       console.log('received', res.rows.length);
+  const data = await client.send(new ReceiveMessageCommand(params));
 
-  //       //save into Db
+  const timeDiffInSeconds = (new Date().valueOf() - startTime.valueOf()) / 1000;
+  // take max time difference from user
+  if (timeDiffInSeconds > 30 && !data.Messages) {
+    return;
+  }
 
-  //       const deleteParams = {
-  //         QueueUrl: queueUrl,
-  //         ReceiptHandle: message.ReceiptHandle as string,
-  //       };
-  //       sqs.deleteMessage(deleteParams, (err, data) => {
-  //         if (err) {
-  //           console.log('Delete Error', err);
-  //         } else {
-  //           console.log('Message Deleted');
-  //           receiveMessageListener();
-  //         }
-  //       });
-  //     });
-  //   } else {
-  //     receiveMessageListener();
-  //   }
-  // });
+  if (data.Messages) {
+    data.Messages.forEach(message => {
+      const res: {rows: any[]; types: Record<string, string>[]} = JSON.parse(
+        message.Body as string,
+      );
+      console.log(res);
+
+      // invoke save to db provider
+    });
+
+    //delete from queue
+    const deleteCommandReceiptHandle: DeleteMessageBatchRequestEntry[] = [];
+    data.Messages?.forEach((message, index) =>
+      deleteCommandReceiptHandle.push({
+        Id: `${group}_${index}`,
+        ReceiptHandle: message.ReceiptHandle,
+      }),
+    );
+
+    await client.send(
+      new DeleteMessageBatchCommand({
+        Entries: deleteCommandReceiptHandle,
+        QueueUrl: getQueueURL(level),
+      }),
+    );
+  }
+
+  await receive(level, startTime, group++);
 }
