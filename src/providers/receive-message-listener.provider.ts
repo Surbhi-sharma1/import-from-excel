@@ -1,74 +1,128 @@
-import {
-  DeleteMessageBatchCommand,
-  DeleteMessageBatchRequestEntry,
-  ReceiveMessageCommand,
-} from '@aws-sdk/client-sqs';
-import {/* inject, */ BindingScope, injectable, Provider} from '@loopback/core';
-import {client, getQueueURL} from './send-message.provider';
+import {SendMessageCommand} from '@aws-sdk/client-sqs';
+import {BindingScope, inject, injectable, Provider} from '@loopback/core';
+import {Worker} from 'worker_threads';
+import {TestDataSource} from '../datasources';
+import {ackQueueUrl, client} from './send-message.provider';
 
-// const queueUrl =
-//   'https://sqs.us-east-1.amazonaws.com/341707006720/import-excel-barleen.fifo';
+export const fileCount = new Map<string, number>();
 
 @injectable({scope: BindingScope.TRANSIENT})
 export class ReceiveMessageListenerProvider implements Provider<() => void> {
-  constructor(/* Add @inject to inject parameters */) {}
+  constructor(
+    @inject('datasources.test') private dataSource: TestDataSource, // @inject('repositories.Test') private repo: TestRepository,
+  ) {}
 
   value() {
-    return receiveMessageListener;
-  }
-}
-
-async function receiveMessageListener() {
-  // take max outline level as input from user
-  for (let i = 0; i <= 4; i++) {
-    await receive(i, new Date());
-  }
-}
-async function receive(level: number, startTime: Date, group: number = 1) {
-  //MaxNumberOfMessages maximum value = 10
-  //WaitTimeSeconds maximum value = 20
-  const params = {
-    AttributeNames: ['SentTimestamp'],
-    MaxNumberOfMessages: 10,
-    MessageAttributeNames: ['All'],
-    QueueUrl: getQueueURL(level),
-    WaitTimeSeconds: 20,
-  };
-
-  const data = await client.send(new ReceiveMessageCommand(params));
-
-  const timeDiffInSeconds = (new Date().valueOf() - startTime.valueOf()) / 1000;
-  // take max time difference from user
-  if (timeDiffInSeconds > 30 && !data.Messages) {
-    return;
+    return () => this.receiveMessageListener();
   }
 
-  if (data.Messages) {
-    data.Messages.forEach(message => {
-      const res: {rows: any[]; types: Record<string, string>[]} = JSON.parse(
-        message.Body as string,
-      );
-      console.log(res);
-
+  receiveMessageListener() {
+    const path = __dirname + '/receive-worker-file.js';
+    const worker = new Worker(path);
+    const worker2 = new Worker(path);
+    worker.on('message', message => {
       // invoke save to db provider
+
+      let command = `INSERT INTO public.test (id, first_name, last_name, gender, country, age, date, identity) VALUES `;
+      message.data.rows.forEach(
+        (
+          row: {
+            [x: string]: any;
+            first_name: any;
+            last_name: any;
+            gender: any;
+            country: any;
+            age: any;
+            date: any;
+            Id: any;
+          },
+          index: number,
+        ) => {
+          const firstName = row['First Name'];
+          const lastName = row['Last Name'];
+          const gender = row['Gender'];
+          const country = row['Country'];
+          const age = row['Age'];
+          const date = row.Date;
+          const identity = row.Id;
+          const id = row['0'];
+          command += ` ('${id}'::bigint,
+             '${firstName}'::character varying, '${lastName}'::character varying, '${gender}'::character varying, '${country}'::character varying, '${age}'::numeric,'${date}'::date,'${identity}'::numeric), `;
+          if (index === message.data.rows.length - 1) {
+            this.executeCommand(command.substring(0, command.length - 2));
+          }
+        },
+      );
+
+      const count =
+        (fileCount.get(message.fileId) ?? 0) + message.data.rows.length;
+      fileCount.set(message.fileId, count);
+
+      if (count === message.totalRows) {
+        const input = {
+          QueueUrl: ackQueueUrl,
+          MessageBody: message.fileId,
+        };
+        client.send(new SendMessageCommand(input));
+        fileCount.set(message.fileId, 0);
+      }
     });
 
-    //delete from queue
-    const deleteCommandReceiptHandle: DeleteMessageBatchRequestEntry[] = [];
-    data.Messages?.forEach((message, index) =>
-      deleteCommandReceiptHandle.push({
-        Id: `${group}_${index}`,
-        ReceiptHandle: message.ReceiptHandle,
-      }),
-    );
+    worker2.on('message', message => {
+      // invoke save to db provider
 
-    await client.send(
-      new DeleteMessageBatchCommand({
-        Entries: deleteCommandReceiptHandle,
-        QueueUrl: getQueueURL(level),
-      }),
-    );
+      let command = `INSERT INTO public.test (id, first_name, last_name, gender, country, age, date, identity) VALUES `;
+      message.data.rows.forEach(
+        (
+          row: {
+            [x: string]: any;
+            first_name: any;
+            last_name: any;
+            gender: any;
+            country: any;
+            age: any;
+            date: any;
+            Id: any;
+          },
+          index: number,
+        ) => {
+          const firstName = row['First Name'];
+          const lastName = row['Last Name'];
+          const gender = row['Gender'];
+          const country = row['Country'];
+          const age = row['Age'];
+          const date = row.Date;
+          const identity = row.Id;
+          const id = row['0'];
+          command += ` ('${id}'::bigint,
+             '${firstName}'::character varying, '${lastName}'::character varying, '${gender}'::character varying, '${country}'::character varying, '${age}'::numeric,'${date}'::date,'${identity}'::numeric), `;
+          if (index === message.data.rows.length - 1) {
+            this.executeCommand(command.substring(0, command.length - 2));
+          }
+        },
+      );
+
+      const count =
+        (fileCount.get(message.fileId) ?? 0) + message.data.rows.length;
+      fileCount.set(message.fileId, count);
+
+      if (count === message.totalRows) {
+        const input = {
+          QueueUrl: ackQueueUrl,
+          MessageBody: message.fileId,
+        };
+        client.send(new SendMessageCommand(input));
+        fileCount.set(message.fileId, 0);
+      }
+    });
   }
-
-  await receive(level, startTime, group++);
+  async executeCommand(command: string) {
+    try {
+      await this.dataSource.execute(command);
+      console.timeLog('receive');
+    } catch (err) {
+      console.log(err);
+      throw new Error(err);
+    }
+  }
 }

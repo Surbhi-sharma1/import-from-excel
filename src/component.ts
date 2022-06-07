@@ -9,7 +9,7 @@ import {
 import {RestApplication} from '@loopback/rest';
 import {ImportController} from './controllers';
 import {ImportServiceBindings} from './keys';
-// import {ReceiveMessageListenerObserver} from './observers';
+import {ReceiveMessageListenerObserver} from './observers';
 import {SendMessageProvider} from './providers';
 import {ReceiveMessageListenerProvider} from './providers/receive-message-listener.provider';
 import {MySequence} from './sequence';
@@ -37,7 +37,7 @@ export class ImportServiceComponent implements Component {
 
   bindings: Binding[] = [];
 
-  // lifeCycleObservers = [ReceiveMessageListenerObserver];
+  lifeCycleObservers = [ReceiveMessageListenerObserver];
 
   /**
    * An array of controller classes

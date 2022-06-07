@@ -56,7 +56,10 @@
     "@loopback/rest": "^11.1.2",
     "@loopback/rest-explorer": "^4.1.2",
     "@loopback/service-proxy": "^4.1.2",
+    "loopback-connector-postgresql": "^5.5.0",
+    "node-fetch": "^2.6.7",
     "tslib": "^2.0.0",
+    "uuid": "^8.3.2",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -64,6 +67,7 @@
     "@loopback/eslint-config": "^12.0.4",
     "@loopback/testlab": "^4.1.2",
     "@types/node": "^12.20.47",
+    "@types/uuid": "^8.3.4",
     "eslint": "^8.10.0",
     "source-map-support": "^0.5.21",
     "typescript": "~4.6.3"

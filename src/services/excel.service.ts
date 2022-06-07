@@ -1,11 +1,15 @@
 import {BindingScope, injectable} from '@loopback/core';
 const XLSX = require('xlsx');
 
+// MAKE CONFIGURABLE
+export const batchSize = 100; //number of records/rows in each batch MAKE CONFIGURABLE
+
 @injectable({scope: BindingScope.TRANSIENT})
 export class ExcelService {
   constructor(/* Add @inject to inject parameters */) {}
 
   async getData(types: Record<string, string>) {
+    console.time('parsing');
     // for now reading file from here
     const file = XLSX.readFile(__dirname + '/../../test.xlsx', {
       cellStyles: true,
@@ -17,7 +21,7 @@ export class ExcelService {
     sheets.forEach((sheet: any) => {
       const rowOutlineLevel: number[] = [];
 
-      //find max outline level - can be taken as input from user also
+      //find max outline level
       let maxOutlineLevel = 0;
       sheet['!rows'].forEach((row: any, index: number) => {
         rowOutlineLevel[index] = row.level;
@@ -26,13 +30,13 @@ export class ExcelService {
         }
       });
 
+      console.log('max outline level ', maxOutlineLevel);
       const sheetData = XLSX.utils.sheet_to_json(sheet);
 
       let currentOutlineLevel = 0;
-      const batchSize = 10; //number of records/rows in each batch MAKE CONFIGURABLE
       //make batches according to levels
       while (currentOutlineLevel <= maxOutlineLevel) {
-        batches[currentOutlineLevel] = [];
+        batches[currentOutlineLevel] = batches[currentOutlineLevel] ?? [];
         const currentLevelRowData = sheetData.filter(
           (rowData: any, index: number) => {
             //assuming first row to be header row
@@ -49,6 +53,9 @@ export class ExcelService {
         currentOutlineLevel++;
       }
     });
+    console.timeLog('parsing');
+
+    console.log('parsing complete');
     return batches;
   }
 }

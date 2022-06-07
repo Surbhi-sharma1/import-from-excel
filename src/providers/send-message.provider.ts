@@ -1,23 +1,85 @@
 import {
+  DeleteMessageCommand,
+  ReceiveMessageCommand,
   SendMessageBatchCommand,
   SendMessageBatchRequestEntry,
   SQSClient,
 } from '@aws-sdk/client-sqs';
 import {/* inject, */ BindingScope, injectable, Provider} from '@loopback/core';
+import {v4 as uuidv4} from 'uuid';
 import {MessageData} from '../types';
 
 export const client = new SQSClient({region: 'us-east-1'});
+export const dataQueueUrl =
+  'https://sqs.us-east-1.amazonaws.com/341707006720/import-data';
+
+export const ackQueueUrl =
+  'https://sqs.us-east-1.amazonaws.com/341707006720/import-ack';
 
 @injectable({scope: BindingScope.TRANSIENT})
 export class SendMessageProvider
-  implements Provider<(data: MessageData[], level: number) => Promise<void>>
+  implements Provider<(data: MessageData[][]) => Promise<void>>
 {
   constructor(/* Add @inject to inject parameters */) {}
 
   value() {
-    return this.sendMessage;
+    return (levelWiseBatches: MessageData[][]) =>
+      this.sendMessageLister(levelWiseBatches);
   }
-  async sendMessage(data: MessageData[], level: number) {
+
+  async sendMessageLister(LevelWiseBatches: MessageData[][]) {
+    const fileId = uuidv4();
+
+    let i = 0;
+    console.time('importTime');
+    while (i < LevelWiseBatches.length) {
+      let rows = 0;
+      LevelWiseBatches[i].forEach(message => {
+        rows += message.rows.length;
+      });
+      if (LevelWiseBatches[i].length) {
+        console.log('sending level ', i);
+        this.sendMessage(LevelWiseBatches[i], fileId, rows, i);
+        // wait for ACK
+        await this.waitForACK(fileId);
+        console.log(`level ${i} complete`);
+      }
+      i++;
+    }
+  }
+
+  async waitForACK(fileId: string) {
+    const params = {
+      AttributeNames: ['SentTimestamp'],
+      MaxNumberOfMessages: 10,
+      MessageAttributeNames: [],
+      QueueUrl: ackQueueUrl,
+      WaitTimeSeconds: 20,
+    };
+    const data = await client.send(new ReceiveMessageCommand(params));
+    if (data.Messages) {
+      for (let i = 0; i < data.Messages.length; i++) {
+        const receivedFileId = data.Messages[i].Body;
+        if (receivedFileId === fileId) {
+          console.log(' received ack ', new Date());
+          //delete ack from queue
+          const input = {
+            QueueUrl: ackQueueUrl,
+            ReceiptHandle: data.Messages[i].ReceiptHandle,
+          };
+          await client.send(new DeleteMessageCommand(input));
+          return true;
+        }
+      }
+    }
+    await this.waitForACK(fileId);
+  }
+  sendMessage(
+    data: MessageData[],
+    fileId: string,
+    count: number,
+    level: number,
+  ) {
     let group = 1;
     // divide messages : max 10 messages can be sent at once in sqs via SendMessageBatchCommand
     for (let i = 0; i < data.length; i += 10) {
@@ -27,7 +89,7 @@ export class SendMessageProvider
         QueueUrl: string;
         Entries: SendMessageBatchRequestEntry[];
       } = {
-        QueueUrl: getQueueURL(level) as string,
+        QueueUrl: dataQueueUrl,
         Entries: [],
       };
 
@@ -43,32 +105,28 @@ export class SendMessageProvider
               DataType: 'String',
               StringValue: 'Barleen',
             },
+            FileId: {
+              DataType: 'String',
+              StringValue: fileId,
+            },
+            Level: {
+              DataType: 'Number',
+              StringValue: `${level}`,
+            },
+            Count: {
+              DataType: 'Number',
+              StringValue: `${count}`, // count of total number of entries in a level
+            },
           },
           MessageBody: JSON.stringify(message),
-          Id: `group_${group}_message_${index + 1}`,
+          Id: `file_${fileId}_level_${level}_group_${group}_message_${
+            index + 1
+          }`,
         });
       });
-      await client.send(new SendMessageBatchCommand(params));
+      client.send(new SendMessageBatchCommand(params));
+
       group++;
     }
-  }
-}
-export function getQueueURL(level: number) {
-  // max 8 levels permitted in excel. take queue urls from user
-  switch (level) {
-    case 0:
-      return 'https://sqs.us-east-1.amazonaws.com/341707006720/import-level0';
-
-    case 1:
-      return 'https://sqs.us-east-1.amazonaws.com/341707006720/import-level1';
-
-    case 2:
-      return 'https://sqs.us-east-1.amazonaws.com/341707006720/import-level2';
-
-    case 3:
-      return 'https://sqs.us-east-1.amazonaws.com/341707006720/import-level3';
-
-    case 4:
-      return 'https://sqs.us-east-1.amazonaws.com/341707006720/import-level4';
   }
 }
