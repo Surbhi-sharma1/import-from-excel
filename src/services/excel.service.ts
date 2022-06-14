@@ -2,7 +2,7 @@ import {BindingScope, injectable} from '@loopback/core';
 const XLSX = require('xlsx');
 
 // MAKE CONFIGURABLE
-export const batchSize = 100; //number of records/rows in each batch MAKE CONFIGURABLE
+export const batchSize = 30; //number of records/rows in each batch MAKE CONFIGURABLE
 
 @injectable({scope: BindingScope.TRANSIENT})
 export class ExcelService {
@@ -11,7 +11,7 @@ export class ExcelService {
   async getData(types: Record<string, string>) {
     console.time('parsing');
     // for now reading file from here
-    const file = XLSX.readFile(__dirname + '/../../test.xlsx', {
+    const file = XLSX.readFile(__dirname + '/../../final_test.xlsx', {
       cellStyles: true,
     });
 
@@ -23,7 +23,7 @@ export class ExcelService {
 
       //find max outline level
       let maxOutlineLevel = 0;
-      sheet['!rows'].forEach((row: any, index: number) => {
+      sheet['!rows']?.forEach((row: any, index: number) => {
         rowOutlineLevel[index] = row.level;
         if (row.level > maxOutlineLevel) {
           maxOutlineLevel = row.level;
@@ -31,7 +31,9 @@ export class ExcelService {
       });
 
       console.log('max outline level ', maxOutlineLevel);
-      const sheetData = XLSX.utils.sheet_to_json(sheet);
+      const sheetData = XLSX.utils.sheet_to_json(sheet, {
+        raw: false,
+      });
 
       let currentOutlineLevel = 0;
       //make batches according to levels
