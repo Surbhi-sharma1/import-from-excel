@@ -10,8 +10,7 @@ export class ExcelService {
 
   async getData(types: Record<string, string>) {
     console.time('parsing');
-    // for now reading file from here
-    const file = XLSX.readFile(__dirname + '/../../final_test.xlsx', {
+    const file = XLSX.readFile(__dirname + '/../../test_50.xlsx', {
       cellStyles: true,
     });
 
@@ -34,7 +33,6 @@ export class ExcelService {
       const sheetData = XLSX.utils.sheet_to_json(sheet, {
         raw: false,
       });
-
       let currentOutlineLevel = 0;
       //make batches according to levels
       while (currentOutlineLevel <= maxOutlineLevel) {

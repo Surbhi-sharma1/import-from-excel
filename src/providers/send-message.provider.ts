@@ -11,15 +11,14 @@ import {MessageData} from '../types';
 
 export const client = new SQSClient({region: 'us-east-1'});
 export const dataQueueUrl =
-  'https://sqs.us-east-1.amazonaws.com/341707006720/import-data';
+  'https://sqs.us-east-1.amazonaws.com/341707006720/import_data';
 
 export const ackQueueUrl =
-  'https://sqs.us-east-1.amazonaws.com/341707006720/import-ack';
+  'https://sqs.us-east-1.amazonaws.com/341707006720/import_ack';
 
 @injectable({scope: BindingScope.TRANSIENT})
 export class SendMessageProvider
-  implements Provider<(data: MessageData[][]) => Promise<void>>
-{
+  implements Provider<(data: MessageData[][]) => Promise<void>> {
   constructor(/* Add @inject to inject parameters */) {}
 
   value() {

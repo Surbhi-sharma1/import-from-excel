@@ -1,8 +1,9 @@
+import dotenv from 'dotenv';
 import {ApplicationConfig, ExcelApplication} from './application';
-
 export * from './application';
-
+dotenv.config();
 export async function main(options: ApplicationConfig = {}) {
+  dotenv.config();
   const app = new ExcelApplication(options);
   await app.boot();
   await app.start();
