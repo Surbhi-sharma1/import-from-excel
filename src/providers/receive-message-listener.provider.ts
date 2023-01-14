@@ -9,6 +9,8 @@ import {v4 as uuidv4} from 'uuid';
 import {TestDataSource} from '../datasources';
 import {ackQueueUrl, client, dataQueueUrl} from './send-message.provider';
 
+/* A global variable that is used to keep track of the number of rows that have
+been processed for a file. */
 export const fileCount = new Map<string, number>();
 const maxCount = 10; // MAKE CONFIGURABLE
 // let remainingMessages = Infinity;
@@ -16,9 +18,8 @@ const maxCount = 10; // MAKE CONFIGURABLE
 @injectable({scope: BindingScope.TRANSIENT})
 export class ReceiveMessageListenerProvider implements Provider<() => void> {
   constructor(
-    @inject('datasources.test') private dataSource: TestDataSource, // @inject('repositories.TestRepository')
-  ) // private testRepository: TestRepository, worksss
-  {}
+    @inject('datasources.test') private dataSource: TestDataSource, // @inject('repositories.TestRepository') // private testRepository: TestRepository, worksss
+  ) {}
 
   value() {
     return () => this.receiveInvoker();
@@ -136,7 +137,7 @@ export class ReceiveMessageListenerProvider implements Provider<() => void> {
       const baseline_start = row['Baseline Start'] ?? '1/1/1';
       const baseline_finish = row['Baseline Finish'] ?? '1/1/1';
       const variance = row['Variance'] ?? 0;
-      command += ` (E'${name}'::character varying, '${p_start_date}'::date, '${p_end_date}'::date, '${a_start_date}'::date, '${a_end_date}'::date,'${duration}'::character varying,'${executing_party}'::character varying, '${party_contact}'::character varying,'${c_field}'::character varying, '${status}'::character varying, '${critical}'::character varying, '${predecessor}'::numeric, E'${dependency}'::character varying, E'${ext_dependency}'::character varying, E'${comments}'::character varying, '${deliverable}'::character varying, '${key}'::character varying, '${workstream}'::character varying, '${milestone}'::character varying, '${last_updated}'::character varying, '${baseline_start}'::date, '${baseline_finish}'::date, '${variance}'::numeric), `;
+      command += ` (E'${name}'::character varying, TO_DATE('${p_start_date}','MM/DD/YYYY'),TO_DATE('${p_end_date}','MM/DD/YYYY'), TO_DATE('${a_start_date}','MM/DD/YYYY'), TO_DATE('${a_start_date}','MM/DD/YYYY'),'${duration}'::character varying,'${executing_party}'::character varying, '${party_contact}'::character varying,'${c_field}'::character varying, '${status}'::character varying, '${critical}'::character varying, '${predecessor}'::numeric, E'${dependency}'::character varying, E'${ext_dependency}'::character varying, E'${comments}'::character varying, '${deliverable}'::character varying, '${key}'::character varying, '${workstream}'::character varying, '${milestone}'::character varying, '${last_updated}'::character varying, TO_DATE('${baseline_start}','MM/DD/YYYY'), TO_DATE('${baseline_finish}','MM/DD/YYYY'), '${variance}'::numeric), `;
       if (index === data.rows.length - 1) {
         this.executeCommand(command.substring(0, command.length - 2));
       }
